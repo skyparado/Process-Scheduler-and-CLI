@@ -1,0 +1,15 @@
+# Build output
+build/
+*.exe
+*.obj
+*.o
+*.pdb
+*.ilk
+
+# Generated at runtime
+csopesy-log.txt
+
+# Editor / OS
+.vs/
+.vscode/
+*.user
