@@ -24,7 +24,7 @@ int main() {
 
     std::string line;
     while (true) {
-        std::cout << "root:\\> ";
+        std::cout << console.prompt();
         if (!std::getline(std::cin, line)) break;   // EOF
         if (!interp.handle(line)) break;            // 'exit'
     }

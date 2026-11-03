@@ -10,8 +10,9 @@
 // SLEEP handling are added here by the Scheduler teammate.
 // ============================================================================
 #include "Config.h"
+#include "Process.h"
 #include <string>
-#include <set>
+#include <map>
 #include <iosfwd>
 
 class Scheduler {
@@ -25,11 +26,16 @@ public:
     // Returns false if a process with that name already exists.
     bool createProcess(const std::string& name);
     bool hasProcess(const std::string& name) const;
+    const Process* getProcess(const std::string& name) const;
+    std::size_t processCount() const;
+    std::size_t finishedProcessCount() const;
+    std::size_t runningProcessCount() const;
+    std::size_t coreCount() const { return static_cast<std::size_t>(cfg.numCpu); }
 
 private:
     const Config&          cfg;
     std::ostream&          out;
-    std::set<std::string>  processes;   // stub registry of created processes
+    std::map<std::string, Process> processes;
     bool                   running = false;
     int                    nextPid = 1;
 };

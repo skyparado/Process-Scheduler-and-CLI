@@ -7,7 +7,7 @@ REM          build.bat test     (build then run the unit tests)
 REM ===========================================================================
 setlocal
 
-set "VCVARS=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+set "VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 if not exist "%VCVARS%" (
     echo [build] Could not find vcvars64.bat. Edit VCVARS in build.bat to point
     echo         at your Visual Studio install, or build with CMake instead.
