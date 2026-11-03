@@ -10,6 +10,7 @@
 
 namespace {
 const char* clearScreen = "\x1b[2J\x1b[H";
+}
 
 std::string timestamp() {
     const std::time_t now = std::time(nullptr);
@@ -22,7 +23,6 @@ std::string timestamp() {
     std::ostringstream result;
     result << std::put_time(&localTime, "%m/%d/%Y %I:%M:%S%p");
     return result.str();
-}
 }
 
 Console::Console(std::ostream& out) : out(out) {}

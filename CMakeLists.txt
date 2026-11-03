@@ -11,15 +11,17 @@ add_executable(csopesy
     src/CommandInterpreter.cpp
     src/Console.cpp
     src/Scheduler.cpp
+    src/Process.cpp
 )
 
-# Unit tests (Sky's Command Interpreter + Config)
+# Unit tests (Command Interpreter + Config, Process + Instructions)
 add_executable(csopesy_tests
     tests/test_main.cpp
     src/Config.cpp
     src/CommandInterpreter.cpp
     src/Console.cpp
     src/Scheduler.cpp
+    src/Process.cpp
 )
 
 enable_testing()

@@ -25,7 +25,7 @@ Option B — CMake (any platform / compiler)
 
 Option C — g++ / MinGW
     g++ -std=c++17 -Isrc src/main.cpp src/Config.cpp src/CommandInterpreter.cpp ^
-        src/Console.cpp src/Scheduler.cpp -o csopesy
+        src/Console.cpp src/Scheduler.cpp src/Process.cpp -o csopesy
     (tests: swap src/main.cpp for tests/test_main.cpp, add -o csopesy_tests)
 
 USAGE
@@ -57,6 +57,23 @@ menu; `exit` from the main menu quits the program.
 and finished process counts. `report-util` writes the same report to
 `csopesy-log.txt`. All display timestamps use `MM/DD/YYYY HH:MM:SSAM/PM`.
 
+Process instructions
+--------------------
+Each process gets a random program of min-ins to max-ins lines. A line is one
+executed instruction, so a FOR counts as its body times its repeats, and
+`Current instruction line` ends exactly at `Lines of code`.
+
+    PRINT(msg, var)            log msg (default "Hello world from <name>!") + var
+    DECLARE(var, value)        create a uint16 variable
+    ADD(var1, var2/v, var3/v)  var1 = var2/v + var3/v
+    SUBTRACT(var1, ...)        var1 = var2/v - var3/v
+    SLEEP(X)                   sleep for X (uint8) CPU ticks
+    FOR([instructions], n)     repeat n times, nested up to 3 levels
+
+Variables are clamped to 0..65535, and undeclared ones read as 0. They are kept
+until the process finishes. PRINT only writes to the process's logs, which
+`process-smi` displays.
+
 config.txt
 ----------
 Space-separated key/value file read by `initialize`. Out-of-range or missing
@@ -67,7 +84,7 @@ MODULE OWNERSHIP
 ----------------
 Sky  : Command Interpreter (src/CommandInterpreter.*) + Config (src/Config.*),
        plus tests/test_main.cpp.
+Theo : Process + Instructions (src/Process.*).
 Stubs for teammates (clearly marked TODO), to be replaced with the real code:
        src/Console.*    Console UI / Display
        src/Scheduler.*  Scheduler + Main/Controller (tick loop, cores, FCFS/RR)
-       src/Process.h    Process + Instructions (PRINT/DECLARE/ADD/.../FOR)

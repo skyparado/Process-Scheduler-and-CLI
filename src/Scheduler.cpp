@@ -34,8 +34,7 @@ bool Scheduler::createProcess(const std::string& name) {
     Process process;
     process.name = name;
     process.pid = nextPid++;
-    process.totalLines = static_cast<std::size_t>(cfg.minIns);
-    process.logs.push_back("Process created.");
+    process.generateInstructions(cfg.minIns, cfg.maxIns);
     processes.emplace(name, process);
     return true;
 }

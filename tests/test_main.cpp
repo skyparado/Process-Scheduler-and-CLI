@@ -1,5 +1,6 @@
 // ============================================================================
 // test_main.cpp  -  unit tests for Sky's Command Interpreter + Config module
+//                   and Theo's Process + Instructions module
 //
 // Tiny assertion harness (no external framework). Builds as its own executable;
 // does not need the teammates' real Console/Scheduler/Process code -- it uses
@@ -9,12 +10,16 @@
 #include "../src/Console.h"
 #include "../src/Scheduler.h"
 #include "../src/CommandInterpreter.h"
+#include "../src/Process.h"
 
 #include <iostream>
 #include <sstream>
 #include <fstream>
 #include <string>
 #include <cstdio>
+#include <regex>
+#include <set>
+#include <vector>
 
 static int g_failures = 0;
 static int g_checks   = 0;
@@ -190,11 +195,195 @@ static void test_config() {
 }
 
 // ---------------------------------------------------------------------------
+// Run a process the way the Scheduler will: one line or one sleep tick at a time.
+static void runToEnd(Process& p) {
+    for (int guard = 0; guard < 1000000 && !p.finished; ++guard) {
+        if (p.sleepTicks > 0) p.tickSleep();
+        else p.executeNext(0);
+    }
+}
+
+// Record the instruction types, deepest FOR nesting, and stored size of a block.
+static void scan(const std::vector<Instruction>& block, int depth,
+                 std::set<InstructionType>& seen, int& deepest, std::size_t& stored) {
+    for (const Instruction& ins : block) {
+        seen.insert(ins.type);
+        ++stored;
+        if (ins.type == InstructionType::FOR) {
+            if (depth + 1 > deepest) deepest = depth + 1;
+            scan(ins.body, depth + 1, seen, deepest, stored);
+        }
+    }
+}
+
+static void test_process() {
+    std::cout << "[process]\n";
+    using I = Instruction;
+
+    // PRINT: default message, spec log format, custom message with one variable
+    {
+        Process p;
+        p.name = "p01";
+        p.setInstructions({I::Print(), I::Declare("x", 7), I::Print("Value from: ", "x")});
+        p.executeNext(2);
+        const std::regex format(
+            R"(^\(\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}[AP]M\) Core:2 "Hello world from p01!"$)");
+        check(p.logs.size() == 1 && std::regex_match(p.logs[0], format),
+              "PRINT logs the default message in the spec's format");
+        runToEnd(p);
+        check(p.logs.size() == 2 && contains(p.logs[1], "\"Value from: 7\""),
+              "PRINT appends one variable to a custom message");
+    }
+
+    // DECLARE / ADD / SUBTRACT, auto-declare, clamp. The trailing PRINT keeps the
+    // process unfinished so its variables can still be read.
+    {
+        Process p;
+        p.setInstructions({
+            I::Declare("a", 10),
+            I::Add("b", "a", 5),
+            I::Subtract("c", "b", "a"),
+            I::Add("d", "ghost", 1),
+            I::Add("high", 65535, 1),
+            I::Subtract("low", 3, 5),
+            I::Declare("big", 70000),
+            I::Add("a", "a", "a"),
+            I::Print()});
+        for (int i = 0; i < 8; ++i) p.executeNext(0);
+        check(p.variables["a"] == 20, "ADD can overwrite its own source");
+        check(p.variables["b"] == 15, "ADD adds a variable and a literal");
+        check(p.variables["c"] == 5, "SUBTRACT subtracts two variables");
+        check(p.variables["d"] == 1 && p.variables.count("ghost") == 1
+                  && p.variables["ghost"] == 0, "undeclared variable auto-declared as 0");
+        check(p.variables["high"] == 65535, "ADD clamps at 65535");
+        check(p.variables["low"] == 0, "SUBTRACT clamps at 0");
+        check(p.variables["big"] == 65535, "DECLARE clamps at 65535");
+    }
+
+    // SLEEP: no execution until woken; a process cannot finish while asleep
+    {
+        Process p;
+        p.setInstructions({I::Sleep(2), I::Print()});
+        p.executeNext(0);
+        check(p.sleepTicks == 2 && p.currentLine == 1, "SLEEP puts the process to sleep");
+        p.executeNext(0);
+        check(p.currentLine == 1 && p.logs.empty(), "a sleeping process executes nothing");
+        p.tickSleep();
+        p.tickSleep();
+        check(p.sleepTicks == 0, "sleep ends after X ticks");
+        p.executeNext(0);
+        check(p.finished && p.logs.size() == 1, "process resumes after waking");
+
+        Process q;
+        q.setInstructions({I::Sleep(1)});
+        q.executeNext(0);
+        check(!q.finished, "process ending in SLEEP is not finished while asleep");
+        q.tickSleep();
+        check(q.finished, "process ending in SLEEP finishes when it wakes");
+    }
+
+    // FOR: 3 nested levels run and count correctly; a 4th level is refused
+    {
+        Process p;
+        p.setInstructions({
+            I::For({I::For({I::For({I::Add("n", "n", 1)}, 2)}, 3)}, 2),
+            I::Print("n=", "n")});
+        check(p.totalLines == 13, "total lines count FOR body * repeats");
+        runToEnd(p);
+        check(p.finished && p.currentLine == 13, "current line ends at total lines");
+        check(p.logs.size() == 1 && contains(p.logs[0], "\"n=12\""),
+              "3-level nested FOR runs its body 2*3*2 times");
+
+        Process skip;
+        skip.setInstructions({I::For({I::Print()}, 0), I::For({}, 5), I::Print()});
+        runToEnd(skip);
+        check(skip.finished && skip.logs.size() == 1, "empty and 0-repeat FORs are skipped");
+
+        Process deep;
+        const auto four = I::For({I::For({I::For({I::For({I::Print()}, 1)}, 1)}, 1)}, 1);
+        check(!deep.setInstructions({four}) && deep.totalLines == 0,
+              "FOR nested 4 levels is refused");
+    }
+
+    // A copy made in the middle of a FOR must not depend on the original
+    {
+        Process original;
+        original.setInstructions({I::For({I::Print(), I::Print()}, 3)});
+        for (int i = 0; i < 3; ++i) original.executeNext(0);
+        Process copy = original;
+        original = Process();
+        runToEnd(copy);
+        check(copy.finished && copy.logs.size() == 6, "copied process continues correctly");
+    }
+
+    // Finishing frees instructions and variables but keeps what process-smi shows
+    {
+        Process p;
+        p.setInstructions({I::Declare("x", 1), I::Print()});
+        runToEnd(p);
+        check(p.instructions.empty() && p.variables.empty(),
+              "instructions and variables released on finish");
+        check(p.logs.size() == 1 && p.totalLines == 2, "logs and line counts kept on finish");
+    }
+
+    // Random programs: right length, valid nesting, all types, run to completion
+    {
+        bool inRange = true, completes = true;
+        std::set<InstructionType> seen;
+        int deepest = 0;
+        for (int i = 0; i < 30; ++i) {
+            Process p;
+            p.name = "gen";
+            p.generateInstructions(1000, 2000);
+            inRange = inRange && p.totalLines >= 1000 && p.totalLines <= 2000;
+            std::size_t stored = 0;
+            scan(p.instructions, 0, seen, deepest, stored);
+            runToEnd(p);
+            completes = completes && p.finished && p.currentLine == p.totalLines;
+        }
+        check(inRange, "generated length is between min-ins and max-ins");
+        check(completes, "generated programs run to completion");
+        check(seen.size() == 6, "generated programs use all 6 instruction types");
+        check(deepest == 3, "generated FORs nest up to 3 levels");
+
+        Process one;
+        one.generateInstructions(1, 1);
+        check(one.totalLines == 1, "min-ins = max-ins = 1 gives exactly one line");
+
+        Process swapped;
+        swapped.generateInstructions(200, 100);
+        check(swapped.totalLines >= 100 && swapped.totalLines <= 200,
+              "min-ins above max-ins is still handled");
+
+        Process huge;
+        huge.generateInstructions(Config::U32_CEIL, Config::U32_CEIL);
+        std::size_t stored = 0;
+        scan(huge.instructions, 0, seen, deepest, stored);
+        check(huge.totalLines == Config::U32_CEIL && stored < 10000,
+              "2^32 lines fit in a small stored program");
+    }
+
+    // The Scheduler gives each process a real program sized from config
+    {
+        std::ostringstream out;
+        Config cfg;
+        cfg.minIns = 30;
+        cfg.maxIns = 40;
+        Scheduler sched(cfg, out);
+        sched.createProcess("p01");
+        const Process* p = sched.getProcess("p01");
+        check(p != nullptr && p->totalLines >= 30 && p->totalLines <= 40 && p->logs.empty(),
+              "createProcess generates instructions from min-ins and max-ins");
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
-    std::cout << "Running CSOPESY interpreter + config tests...\n";
+    std::cout << "Running CSOPESY interpreter + config + process tests...\n";
     test_parse();
     test_gate_and_dispatch();
     test_config();
+    test_process();
 
     std::cout << "----------------------------------------\n";
     std::cout << g_checks - g_failures << "/" << g_checks << " checks passed.\n";

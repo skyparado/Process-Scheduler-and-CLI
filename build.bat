@@ -19,12 +19,12 @@ if not exist build mkdir build
 
 echo [build] Compiling emulator...
 cl /nologo /EHsc /std:c++17 /W3 /Fe:build\csopesy.exe /Fo:build\ ^
-   src\main.cpp src\Config.cpp src\CommandInterpreter.cpp src\Console.cpp src\Scheduler.cpp
+   src\main.cpp src\Config.cpp src\CommandInterpreter.cpp src\Console.cpp src\Scheduler.cpp src\Process.cpp
 if errorlevel 1 exit /b 1
 
 echo [build] Compiling tests...
 cl /nologo /EHsc /std:c++17 /W3 /Fe:build\csopesy_tests.exe /Fo:build\ ^
-   tests\test_main.cpp src\Config.cpp src\CommandInterpreter.cpp src\Console.cpp src\Scheduler.cpp
+   tests\test_main.cpp src\Config.cpp src\CommandInterpreter.cpp src\Console.cpp src\Scheduler.cpp src\Process.cpp
 if errorlevel 1 exit /b 1
 
 echo [build] Done. Binaries in .\build\

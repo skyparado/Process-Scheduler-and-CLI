@@ -13,6 +13,9 @@
 
 class Scheduler;
 
+// Current time as MM/DD/YYYY HH:MM:SSAM/PM, the one format used for all output.
+std::string timestamp();
+
 class Console {
 public:
     explicit Console(std::ostream& out);
