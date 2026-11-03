@@ -11,16 +11,28 @@
 #include <string>
 #include <iosfwd>
 
+class Scheduler;
+
 class Console {
 public:
     explicit Console(std::ostream& out);
 
+    void setScheduler(const Scheduler* scheduler);
     void printMainMenu();                              // CSOPESY header + prompt
     void enterProcessScreen(const std::string& name);  // screen -s / screen -r
     void printProcessSmi(const std::string& name);     // process-smi
     void printScreenLs();                              // screen -ls
     void saveReport();                                 // report-util -> csopesy-log.txt
+    void leaveProcessScreen();
+    bool isInProcessScreen() const;
+    std::string prompt() const;
 
 private:
     std::ostream& out;
+    const Scheduler* scheduler = nullptr;
+    std::string currentProcess;
+    bool processScreen = false;
+
+    std::string screenLsText() const;
+    std::string screenLsReport() const;
 };

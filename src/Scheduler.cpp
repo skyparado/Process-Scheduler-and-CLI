@@ -3,6 +3,7 @@
 // ============================================================================
 #include "Scheduler.h"
 #include <ostream>
+#include <algorithm>
 
 Scheduler::Scheduler(const Config& cfg, std::ostream& out)
     : cfg(cfg), out(out) {}
@@ -30,11 +31,34 @@ void Scheduler::stop() {
 
 bool Scheduler::createProcess(const std::string& name) {
     if (processes.count(name)) return false;
-    processes.insert(name);
-    (void)nextPid++;   // pid assignment is the Scheduler teammate's concern
+    Process process;
+    process.name = name;
+    process.pid = nextPid++;
+    process.totalLines = static_cast<std::size_t>(cfg.minIns);
+    process.logs.push_back("Process created.");
+    processes.emplace(name, process);
     return true;
 }
 
 bool Scheduler::hasProcess(const std::string& name) const {
     return processes.count(name) != 0;
+}
+
+const Process* Scheduler::getProcess(const std::string& name) const {
+    const auto it = processes.find(name);
+    return it == processes.end() ? nullptr : &it->second;
+}
+
+std::size_t Scheduler::processCount() const {
+    return processes.size();
+}
+
+std::size_t Scheduler::finishedProcessCount() const {
+    return static_cast<std::size_t>(std::count_if(
+        processes.begin(), processes.end(),
+        [](const auto& entry) { return entry.second.finished; }));
+}
+
+std::size_t Scheduler::runningProcessCount() const {
+    return processCount() - finishedProcessCount();
 }

@@ -9,11 +9,16 @@
 // ============================================================================
 #include <string>
 #include <cstdint>
+#include <cstddef>
+#include <vector>
 
 struct Process {
     std::string name;
     int         pid      = 0;
     bool        finished = false;
+    std::size_t currentLine = 0;
+    std::size_t totalLines = 0;
+    std::vector<std::string> logs;
 
     // TODO (Process teammate): instructions, currentLine, totalLines,
     // variables map, logs, etc.

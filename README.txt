@@ -44,6 +44,19 @@ blocked until the config.txt parameters are loaded. Supported commands:
     process-smi           (inside a screen) print this process's info
     exit                  quit the console
 
+Console display
+---------------
+The console prints the CSOPESY header, developer names, and a timestamped
+main menu. `screen -s` and `screen -r` clear the display and enter a
+process-specific prompt. From that prompt, `process-smi` displays the process
+ID, logs, current instruction line, total lines of code, and `Finished!` when
+the process is complete. `exit` from a process screen returns to the main
+menu; `exit` from the main menu quits the program.
+
+`screen -ls` displays CPU utilization, cores used and available, and running
+and finished process counts. `report-util` writes the same report to
+`csopesy-log.txt`. All display timestamps use `MM/DD/YYYY HH:MM:SSAM/PM`.
+
 config.txt
 ----------
 Space-separated key/value file read by `initialize`. Out-of-range or missing

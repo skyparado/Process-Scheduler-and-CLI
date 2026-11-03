@@ -13,7 +13,9 @@
 
 CommandInterpreter::CommandInterpreter(Config& cfg, Console& console,
                                        Scheduler& scheduler, std::ostream& out)
-    : cfg(cfg), console(console), scheduler(scheduler), out(out) {}
+    : cfg(cfg), console(console), scheduler(scheduler), out(out) {
+    console.setScheduler(&scheduler);
+}
 
 // ----------------------------------------------------------------------------
 // parse: command + flag + argument
@@ -111,6 +113,10 @@ bool CommandInterpreter::handle(const std::string& line) {
         return true;
     }
     if (pc.command == "exit") {
+        if (console.isInProcessScreen()) {
+            console.leaveProcessScreen();
+            return true;
+        }
         return false;
     }
     if (pc.command == "screen") {
