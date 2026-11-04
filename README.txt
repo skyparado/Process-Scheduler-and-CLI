@@ -53,8 +53,9 @@ ID, logs, current instruction line, total lines of code, and `Finished!` when
 the process is complete. `exit` from a process screen returns to the main
 menu; `exit` from the main menu quits the program.
 
-`screen -ls` displays CPU utilization, cores used and available, and running
-and finished process counts. `report-util` writes the same report to
+`screen -ls` displays CPU utilization, cores used and available, then lists
+each running process (creation time, core, line / total) and each finished
+process. `screen -r` on a finished process prints "Process <name> not found.". `report-util` writes the same report to
 `csopesy-log.txt`. All display timestamps use `MM/DD/YYYY HH:MM:SSAM/PM`.
 
 Process instructions
@@ -85,6 +86,5 @@ MODULE OWNERSHIP
 Sky  : Command Interpreter (src/CommandInterpreter.*) + Config (src/Config.*),
        plus tests/test_main.cpp.
 Theo : Process + Instructions (src/Process.*).
-Stubs for teammates (clearly marked TODO), to be replaced with the real code:
-       src/Console.*    Console UI / Display
-       src/Scheduler.*  Scheduler + Main/Controller (tick loop, cores, FCFS/RR)
+Console UI / Display (src/Console.*) and Scheduler + Main/Controller
+(src/Scheduler.*, src/main.cpp: tick loop, cores, FCFS/RR) by the other members.

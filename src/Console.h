@@ -37,5 +37,4 @@ private:
     bool processScreen = false;
 
     std::string screenLsText() const;
-    std::string screenLsReport() const;
 };

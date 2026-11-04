@@ -81,7 +81,9 @@ void CommandInterpreter::handleScreen(const ParsedCommand& pc) {
             out << "Error: 'screen -r' requires a process name.\n";
             return;
         }
-        if (!scheduler.hasProcess(pc.argument)) {
+        // Spec: a finished process's screen can no longer be re-attached.
+        Process snapshot;
+        if (!scheduler.getProcessSnapshot(pc.argument, snapshot) || snapshot.finished) {
             out << "Process " << pc.argument << " not found.\n";
             return;
         }
@@ -113,11 +115,18 @@ bool CommandInterpreter::handle(const std::string& line) {
         out << "Already initialized.\n";
         return true;
     }
-    if (pc.command == "exit") {
-        if (console.isInProcessScreen()) {
+    // Inside a process screen only 'process-smi' and 'exit' exist (spec).
+    if (console.isInProcessScreen()) {
+        if (pc.command == "exit") {
             console.leaveProcessScreen();
-            return true;
+        } else if (pc.command == "process-smi") {
+            console.printProcessSmi("");
+        } else {
+            out << "Unknown command: '" << pc.command << "'.\n";
         }
+        return true;
+    }
+    if (pc.command == "exit") {
         return false;
     }
     if (pc.command == "screen") {
@@ -136,13 +145,6 @@ bool CommandInterpreter::handle(const std::string& line) {
         console.saveReport();
         return true;
     }
-    if (pc.command == "process-smi") {
-        // Typed from within a process screen; the Console teammate resolves the
-        // current screen. Argument (if any) names the process to inspect.
-        console.printProcessSmi(pc.argument);
-        return true;
-    }
-
     out << "Unknown command: '" << pc.command << "'.\n";
     return true;
 }

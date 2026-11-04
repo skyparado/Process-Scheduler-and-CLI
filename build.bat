@@ -8,6 +8,11 @@ REM ===========================================================================
 setlocal
 
 set "VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+REM Any VS edition (Community, Build Tools, ...) found by vswhere wins.
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if exist "%VSWHERE%" (
+    for /f "usebackq delims=" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VCVARS=%%i\VC\Auxiliary\Build\vcvars64.bat"
+)
 if not exist "%VCVARS%" (
     echo [build] Could not find vcvars64.bat. Edit VCVARS in build.bat to point
     echo         at your Visual Studio install, or build with CMake instead.

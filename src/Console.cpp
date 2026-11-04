@@ -3,10 +3,12 @@
 
 #include <algorithm>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <ostream>
 #include <sstream>
+#include <vector>
 
 namespace {
 const char* clearScreen = "\x1b[2J\x1b[H";
@@ -58,14 +60,11 @@ void Console::printMainMenu() {
 void Console::enterProcessScreen(const std::string& name) {
     processScreen = true;
     currentProcess = name;
-    out << clearScreen
-        << "=======================================================\n"
-        << "Process screen: " << name << "\n"
-        << "=======================================================\n"
-        << "Type 'process-smi' for process details or 'exit' to return.\n";
+    out << clearScreen;
+    printProcessSmi(name);
 }
 
-
+// Layout follows the spec's process-smi mockup.
 void Console::printProcessSmi(const std::string& name) {
     const std::string processName = name.empty() ? currentProcess : name;
     Process process;
@@ -78,63 +77,70 @@ void Console::printProcessSmi(const std::string& name) {
         return;
     }
 
-    out << "-------------------------------------------------------\n"
-        << "Process Name: " << process.name << "\n"
-        << "Process ID: " << process.pid << "\n"
-        << "Created: " << timestamp() << "\n"
-        << "Current Instruction Line: " << process.currentLine << "\n"
-        << "Lines of Code: " << process.totalLines << "\n"
+    out << "\nProcess name: " << process.name << "\n"
+        << "ID: " << process.pid << "\n"
         << "Logs:\n";
 
     for (const std::string& log : process.logs) {
-        out << "  " << log << "\n";
+        out << log << "\n";
     }
+    out << "\n";
 
     if (process.finished) {
-        out << "Finished.\n";
+        out << "Finished!\n\n";
+    } else {
+        out << "Current instruction line: " << process.currentLine << "\n"
+            << "Lines of code: " << process.totalLines << "\n\n";
     }
-    out << "-------------------------------------------------------\n";
 }
 
-
 std::string Console::screenLsText() const {
-    const std::size_t total = scheduler == nullptr ? 0 : scheduler->processCount();
-    const std::size_t finished = scheduler == nullptr ? 0 : scheduler->finishedProcessCount();
-    const std::size_t running = scheduler == nullptr ? 0 : scheduler->runningProcessCount();
     const std::size_t cores = scheduler == nullptr ? 0 : scheduler->coreCount();
     const std::size_t used = scheduler == nullptr ? 0 : scheduler->activeCoreCount();
     const std::size_t utilization = cores == 0 ? 0 : used * 100 / cores;
+    const std::vector<Scheduler::ProcessInfo> rows =
+        scheduler == nullptr ? std::vector<Scheduler::ProcessInfo>() : scheduler->listProcesses();
+
     std::ostringstream result;
     result << "CPU utilization: " << utilization << "%\n"
            << "Cores used: " << used << "\n"
-           << "Cores available: " << cores - used << "\n"
-           << "Running processes: " << running << "\n"
-           << "Finished processes: " << finished << "\n"
-           << "Total processes: " << total << "\n";
+           << "Cores available: " << cores - used << "\n\n"
+           << "-------------------------------------------------------\n"
+           << "Running processes:\n";
+    // Running = on a core now; queued and sleeping processes wait their turn.
+    for (const auto& row : rows) {
+        if (row.finished || row.core < 0) continue;
+        result << std::left << std::setw(12) << row.name
+               << "(" << row.created << ")   "
+               << "Core: " << std::setw(6) << row.core
+               << row.currentLine << " / " << row.totalLines << "\n";
+    }
+    result << "\nFinished processes:\n";
+    for (const auto& row : rows) {
+        if (!row.finished) continue;
+        result << std::left << std::setw(12) << row.name
+               << "(" << row.created << ")   "
+               << std::setw(12) << "Finished"
+               << row.currentLine << " / " << row.totalLines << "\n";
+    }
+    result << "-------------------------------------------------------\n";
     return result.str();
 }
 
 void Console::printScreenLs() {
-    out << screenLsReport();
+    out << screenLsText();
 }
 
 void Console::saveReport() {
-    std::ofstream report("csopesy-log.txt");
+    const char* path = "csopesy-log.txt";
+    std::ofstream report(path);
     if (!report) {
         out << "Error: could not write csopesy-log.txt.\n";
         return;
     }
-    report << screenLsReport();
-    out << "report-util: saved screen -ls output to csopesy-log.txt.\n";
-}
-
-std::string Console::screenLsReport() const {
-    std::ostringstream result;
-    result << "-------------------------------------------------------\n"
-           << "screen -ls (" << timestamp() << ")\n"
-           << screenLsText()
-           << "-------------------------------------------------------\n";
-    return result.str();
+    report << screenLsText();
+    out << "Report generated at "
+        << std::filesystem::absolute(path).generic_string() << "!\n";
 }
 
 void Console::leaveProcessScreen() {

@@ -1,5 +1,6 @@
 
 #include "Scheduler.h"
+#include "Console.h"
 
 #include <iostream>
 #include <sstream>
@@ -120,17 +121,7 @@ bool Scheduler::createProcess(const std::string& name) {
         if (!initialized || shutdownRequested) {return false;}
         if (processes.find(name) != processes.end()) {return false;}
 
-        ManagedProcess managed;
-
-        managed.process.name = name;
-        managed.process.pid = nextPid++;
-        managed.process.generateInstructions(cfg.minIns,cfg.maxIns);
-
-        managed.state = ProcessState::READY;
-        managed.delayRemaining = 0;
-
-        processes.emplace(name, managed);
-        readyQueue.push_back(name);
+        addProcess(name);
     }
 
     logMessage("Process created: " + name);
@@ -388,6 +379,11 @@ void Scheduler::generateAutomaticProcess() {
         return;
     }
 
+    // no log line: this runs every tick and would flood the user's prompt
+    addProcess(name);
+}
+
+void Scheduler::addProcess(const std::string& name) {
     ManagedProcess managed;
 
     managed.process.name = name;
@@ -396,11 +392,37 @@ void Scheduler::generateAutomaticProcess() {
 
     managed.state = ProcessState::READY;
     managed.delayRemaining = 0;
+    managed.created = timestamp();
 
-    processes.emplace(name, managed);
+    processes.emplace(name, std::move(managed));
     readyQueue.push_back(name);
+}
 
-    logMessage("Automatically generated process: " + name);
+std::vector<Scheduler::ProcessInfo> Scheduler::listProcesses() const {
+    std::lock_guard<std::mutex> lock(schedulerMutex);
+
+    std::vector<std::pair<int, ProcessInfo>> rows; // pid, row
+    for (const auto& entry : processes) {
+        const Process& p = entry.second.process;
+        ProcessInfo info;
+        info.name = p.name;
+        info.created = entry.second.created;
+        info.currentLine = p.currentLine;
+        info.totalLines = p.totalLines;
+        info.finished = entry.second.state == ProcessState::FINISHED;
+        for (const Core& core : cores) {
+            if (core.processName == p.name) {info.core = core.id;}
+        }
+        rows.emplace_back(p.pid, std::move(info));
+    }
+
+    // map order would put p100 before p11
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) {return a.first < b.first;});
+
+    std::vector<ProcessInfo> result;
+    for (auto& row : rows) {result.push_back(std::move(row.second));}
+    return result;
 }
 
 //log scheduler messages
