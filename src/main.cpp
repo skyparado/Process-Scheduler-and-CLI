@@ -28,5 +28,6 @@ int main() {
         if (!std::getline(std::cin, line)) break;   // EOF
         if (!interp.handle(line)) break;            // 'exit'
     }
+    scheduler.shutdown();
     return 0;
 }

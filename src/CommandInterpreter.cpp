@@ -53,6 +53,7 @@ CommandInterpreter::parse(const std::string& line) {
 // ----------------------------------------------------------------------------
 void CommandInterpreter::doInitialize() {
     cfg = Config::loadFromFile("config.txt", out);
+    scheduler.initialize();
     initialized = true;
     out << "Initialized. (num-cpu=" << cfg.numCpu
         << ", scheduler=" << cfg.scheduler

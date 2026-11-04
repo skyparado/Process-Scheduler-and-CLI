@@ -65,33 +65,44 @@ void Console::enterProcessScreen(const std::string& name) {
         << "Type 'process-smi' for process details or 'exit' to return.\n";
 }
 
+
 void Console::printProcessSmi(const std::string& name) {
     const std::string processName = name.empty() ? currentProcess : name;
-    const Process* process = scheduler == nullptr ? nullptr
-                                                   : scheduler->getProcess(processName);
-    if (process == nullptr) {
+    Process process;
+
+    // get copy of process
+    if (scheduler == nullptr ||
+        !scheduler->getProcessSnapshot(processName, process)) {
+
         out << "Process " << processName << " not found.\n";
         return;
     }
 
     out << "-------------------------------------------------------\n"
-        << "Process name: " << process->name << "\n"
-        << "Process ID: " << process->pid << "\n"
+        << "Process Name: " << process.name << "\n"
+        << "Process ID: " << process.pid << "\n"
         << "Created: " << timestamp() << "\n"
-        << "Current instruction line: " << process->currentLine << "\n"
-        << "Lines of code: " << process->totalLines << "\n"
+        << "Current Instruction Line: " << process.currentLine << "\n"
+        << "Lines of Code: " << process.totalLines << "\n"
         << "Logs:\n";
-    for (const std::string& log : process->logs) out << "  " << log << "\n";
-    if (process->finished) out << "Finished!\n";
+
+    for (const std::string& log : process.logs) {
+        out << "  " << log << "\n";
+    }
+
+    if (process.finished) {
+        out << "Finished.\n";
+    }
     out << "-------------------------------------------------------\n";
 }
+
 
 std::string Console::screenLsText() const {
     const std::size_t total = scheduler == nullptr ? 0 : scheduler->processCount();
     const std::size_t finished = scheduler == nullptr ? 0 : scheduler->finishedProcessCount();
     const std::size_t running = scheduler == nullptr ? 0 : scheduler->runningProcessCount();
     const std::size_t cores = scheduler == nullptr ? 0 : scheduler->coreCount();
-    const std::size_t used = std::min(running, cores);
+    const std::size_t used = scheduler == nullptr ? 0 : scheduler->activeCoreCount();
     const std::size_t utilization = cores == 0 ? 0 : used * 100 / cores;
     std::ostringstream result;
     result << "CPU utilization: " << utilization << "%\n"

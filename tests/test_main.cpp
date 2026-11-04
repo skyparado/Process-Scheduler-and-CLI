@@ -365,15 +365,23 @@ static void test_process() {
 
     // The Scheduler gives each process a real program sized from config
     {
-        std::ostringstream out;
+    std::ostringstream out;
+
         Config cfg;
         cfg.minIns = 30;
         cfg.maxIns = 40;
+
         Scheduler sched(cfg, out);
-        sched.createProcess("p01");
-        const Process* p = sched.getProcess("p01");
-        check(p != nullptr && p->totalLines >= 30 && p->totalLines <= 40 && p->logs.empty(),
-              "createProcess generates instructions from min-ins and max-ins");
+
+    // initialize scheduler before creating process
+    sched.initialize();
+    bool created = sched.createProcess("p01");
+    Process p;
+    bool found = sched.getProcessSnapshot("p01", p);
+
+    check(created && found && p.totalLines >= 30 && p.totalLines <= 40,
+          "createProcess generates instructions from min-ins and max-ins");
+    sched.shutdown();
     }
 }
 

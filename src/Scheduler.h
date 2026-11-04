@@ -1,7 +1,7 @@
 #pragma once
 // ============================================================================
 // Scheduler  -  STUB
-// Owner (to implement fully): the "Scheduler + Main/Controller" teammate.
+// Owner: Ethan
 //
 // Sky's Command Interpreter dispatches to this interface. The stub keeps just
 // enough state (a set of known process names + a running flag) so that
@@ -11,31 +11,94 @@
 // ============================================================================
 #include "Config.h"
 #include "Process.h"
+
 #include <string>
 #include <map>
+#include <deque>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <cstdint>
 #include <iosfwd>
 
 class Scheduler {
 public:
+
     Scheduler(const Config& cfg, std::ostream& out);
+    ~Scheduler();
 
-    void start();                                   // scheduler-start
-    void stop();                                    // scheduler-stop
-    bool isRunning() const { return running; }
+    void initialize(); //initialize cpu cores
+    void start();
+    void stop();
 
-    // Returns false if a process with that name already exists.
+    void shutdown();
+    bool isRunning() const;
+    bool isInitialized() const;
+
+    //process checking
     bool createProcess(const std::string& name);
     bool hasProcess(const std::string& name) const;
-    const Process* getProcess(const std::string& name) const;
+
+    //copy of process state
+    bool getProcessSnapshot(const std::string& name,Process& result) const;
+
+    //process counts
     std::size_t processCount() const;
     std::size_t finishedProcessCount() const;
     std::size_t runningProcessCount() const;
-    std::size_t coreCount() const { return static_cast<std::size_t>(cfg.numCpu); }
+
+    //cpu counts
+    std::size_t coreCount() const;
+    std::size_t activeCoreCount() const;
+
 
 private:
-    const Config&          cfg;
-    std::ostream&          out;
-    std::map<std::string, Process> processes;
-    bool                   running = false;
-    int                    nextPid = 1;
+
+    enum class ProcessState {READY, RUNNING, SLEEPING, FINISHED};
+
+    struct Core {
+        int id = 0;
+        std::string processName;
+        uint64_t quantumUsed = 0; //num of cpu cylces
+    };
+
+    struct ManagedProcess {
+        Process process;
+        ProcessState state = ProcessState::READY;
+        uint64_t delayRemaining = 0; // busy-wait cycles
+    };
+
+    //config and output
+    const Config& cfg;
+    std::ostream& out;
+
+    //Process Management
+    std::map<std::string, ManagedProcess> processes;
+    std::deque<std::string> readyQueue; //FIFO queue
+    std::vector<Core> cores; //available cores
+
+    //Thread Management
+    std::thread cpuThread;
+    mutable std::mutex schedulerMutex;
+    std::mutex outputMutex;
+
+    bool initialized = false;
+    bool shutdownRequested = false;
+    bool generatorEnabled = false;
+
+    //cycle tracking
+    uint64_t cpuTicks = 0;
+    uint64_t ticksSinceGeneration = 0;
+
+    int nextPid = 1;
+    int nextGeneratedProcess = 1;
+
+    void cpuLoop();
+    void runOneCpuCycle();
+    void assignReadyProcesses();
+    void executeCore(Core& core);
+    void handleSleepingProcesses();
+    void releaseCore(Core& core);
+    void generateAutomaticProcess();
+    void logMessage(const std::string& message);
 };
