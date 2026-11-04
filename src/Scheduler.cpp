@@ -128,11 +128,10 @@ bool Scheduler::createProcess(const std::string& name) {
     return true;
 }
 
-//spec: a finished process can no longer be attached to with screen -r
-bool Scheduler::canAttach(const std::string& name) const {
+//check if process exists
+bool Scheduler::hasProcess(const std::string& name) const {
     std::lock_guard<std::mutex> lock(schedulerMutex);
-    auto it = processes.find(name);
-    return it != processes.end() && !it->second.process.finished;
+    return processes.find(name) != processes.end();
 }
 
 //copy process state for console
@@ -149,46 +148,55 @@ bool Scheduler::getProcessSnapshot(const std::string& name,Process& result) cons
     return true;
 }
 
-//rows for screen -ls and report-util
-std::vector<ProcessSummary> Scheduler::processSummaries() const {
+//count processes
+std::size_t Scheduler::processCount() const {
     std::lock_guard<std::mutex> lock(schedulerMutex);
+    return processes.size();
+}
 
-    std::map<std::string, int> coreOf;
-    for (const Core& core : cores) {
-        if (!core.processName.empty()) {
-            coreOf[core.processName] = core.id;
-        }
-    }
+//count finished processes
+std::size_t Scheduler::finishedProcessCount() const {
+    std::lock_guard<std::mutex> lock(schedulerMutex);
+    std::size_t count = 0;
 
-    std::vector<ProcessSummary> summaries;
     for (const auto& entry : processes) {
-        const Process& process = entry.second.process;
-
-        ProcessSummary summary;
-        summary.name = process.name;
-        summary.createdAt = process.createdAt;
-        summary.pid = process.pid;
-        summary.currentLine = process.currentLine;
-        summary.totalLines = process.totalLines;
-        summary.finished = process.finished;
-
-        auto core = coreOf.find(process.name);
-        if (core != coreOf.end()) {
-            summary.core = core->second;
+        if (entry.second.state == ProcessState::FINISHED) {
+            count++;
         }
-        summaries.push_back(summary);
     }
+    return count;
+}
 
-    //the map is in name order, which would put p100 before p11
-    std::sort(summaries.begin(), summaries.end(),
-        [](const ProcessSummary& a, const ProcessSummary& b) { return a.pid < b.pid; });
-    return summaries;
+//count unfinished processes
+std::size_t Scheduler::runningProcessCount() const {
+    std::lock_guard<std::mutex> lock(schedulerMutex);
+    std::size_t count = 0;
+
+    for (const auto& entry : processes) {
+        if (entry.second.state != ProcessState::FINISHED) {
+            count++;
+        }
+    }
+    return count;
 }
 
 //core count
 std::size_t Scheduler::coreCount() const {
     std::lock_guard<std::mutex> lock(schedulerMutex);
     return cores.size();
+}
+
+//active core count
+std::size_t Scheduler::activeCoreCount() const {
+    std::lock_guard<std::mutex> lock(schedulerMutex);
+    std::size_t count = 0;
+
+    for (const Core& core : cores) {
+        if (!core.processName.empty()) {
+            count++;
+        }
+    }
+    return count;
 }
 
 void Scheduler::cpuLoop() {
@@ -374,6 +382,7 @@ void Scheduler::generateAutomaticProcess() {
         return;
     }
 
+    // no log line: this runs every tick and would flood the user's prompt
     addProcess(name);
 }
 
@@ -382,18 +391,46 @@ void Scheduler::addProcess(const std::string& name) {
 
     managed.process.name = name;
     managed.process.pid = nextPid++;
-    managed.process.createdAt = timestamp();
     managed.process.generateInstructions(cfg.minIns,cfg.maxIns);
 
     managed.state = ProcessState::READY;
     managed.delayRemaining = 0;
+    managed.created = timestamp();
 
-    processes.emplace(name, managed);
+    processes.emplace(name, std::move(managed));
     readyQueue.push_back(name);
 }
 
-//log scheduler messages. Only call from the input thread: printing from the cpu
-//thread would write over the prompt and into attached process screens
+std::vector<Scheduler::ProcessInfo> Scheduler::listProcesses() const {
+    std::lock_guard<std::mutex> lock(schedulerMutex);
+
+    std::vector<std::pair<int, ProcessInfo>> rows; // pid, row
+    for (const auto& entry : processes) {
+        const Process& p = entry.second.process;
+        ProcessInfo info;
+        info.name = p.name;
+        info.created = entry.second.created;
+        info.currentLine = p.currentLine;
+        info.totalLines = p.totalLines;
+        info.finished = entry.second.state == ProcessState::FINISHED;
+        for (const Core& core : cores) {
+            if (core.processName == p.name) {info.core = core.id;}
+        }
+        rows.emplace_back(p.pid, std::move(info));
+    }
+
+    // map order would put p100 before p11
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) {return a.first < b.first;});
+
+    std::vector<ProcessInfo> result;
+    for (auto& row : rows) {result.push_back(std::move(row.second));}
+    return result;
+}
+
+//log scheduler messages
 void Scheduler::logMessage(const std::string& message) {
+    std::lock_guard<std::mutex> lock(outputMutex);
+
     out << message << std::endl;
 }

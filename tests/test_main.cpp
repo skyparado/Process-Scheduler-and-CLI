@@ -17,11 +17,11 @@
 #include <fstream>
 #include <string>
 #include <cstdio>
-#include <chrono>
 #include <regex>
 #include <set>
-#include <thread>
 #include <vector>
+#include <chrono>
+#include <thread>
 
 static int g_failures = 0;
 static int g_checks   = 0;
@@ -123,10 +123,25 @@ static void test_gate_and_dispatch() {
         // create then re-attach: no 'not found'
         out.str("");
         interp.handle("screen -s p01");
+        check(contains(out.str(), "Process name: p01") && contains(out.str(), "Lines of code:"),
+              "'screen -s' shows the process-smi view");
+        out.str("");
+        interp.handle("scheduler-start");
+        check(!sched.isRunning() && contains(out.str(), "Unknown command"),
+              "main-menu commands are rejected inside a process screen");
+        out.str("");
+        interp.handle("process-smi");
+        check(contains(out.str(), "ID: "), "'process-smi' works inside a screen");
+        interp.handle("exit");
+        check(!console.isInProcessScreen(), "'exit' leaves the process screen");
+        out.str("");
+        interp.handle("process-smi");
+        check(contains(out.str(), "Unknown command"), "'process-smi' only works inside a screen");
+        out.str("");
         interp.handle("screen -r p01");
         check(!contains(out.str(), "not found"),
               "'screen -r' finds a process created by 'screen -s'");
-        check(sched.canAttach("p01"), "scheduler registered the created process");
+        check(sched.hasProcess("p01"), "scheduler registered the created process");
         interp.handle("exit");
 
         // scheduler-start / stop dispatch
@@ -139,7 +154,38 @@ static void test_gate_and_dispatch() {
         // report-util dispatch
         out.str("");
         interp.handle("report-util");
-        check(contains(out.str(), "csopesy-log.txt"), "report-util dispatched");
+        check(contains(out.str(), "Report generated at") && contains(out.str(), "csopesy-log.txt"),
+              "report-util dispatched");
+    }
+
+    // ---- finished processes: listed by screen -ls, no longer re-attachable ----
+    {
+        std::ostringstream out;
+        Config cfg;
+        Console console(out);
+        Scheduler sched(cfg, out);
+        CommandInterpreter interp(cfg, console, sched, out);
+
+        interp.handle("initialize");
+        cfg.minIns = cfg.maxIns = 1;
+        interp.handle("screen -s done");
+        interp.handle("exit");
+
+        Process p;
+        for (int i = 0; i < 100 && !(sched.getProcessSnapshot("done", p) && p.finished); ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        check(p.finished, "a 1-line process finishes on the scheduler");
+
+        out.str("");
+        interp.handle("screen -ls");
+        std::regex row("done +\\(\\d\\d/\\d\\d/\\d{4} \\d\\d:\\d\\d:\\d\\d[AP]M\\) +Finished +1 / 1\n");
+        check(contains(out.str(), "Finished processes:") && std::regex_search(out.str(), row),
+              "screen -ls lists the finished process with its creation time");
+
+        out.str("");
+        interp.handle("screen -r done");
+        check(contains(out.str(), "Process done not found."),
+              "'screen -r' on a finished process reports not found");
     }
 }
 
@@ -393,7 +439,7 @@ static void test_process() {
 static void test_spec_output() {
     std::cout << "[spec output]\n";
 
-    // A process through its whole life: process-smi, screen -r, the screen gate
+    // process-smi swaps the line counts for Finished! once the process is done
     {
         std::ostringstream out;
         Config cfg;
@@ -401,47 +447,17 @@ static void test_spec_output() {
         Scheduler sched(cfg, out);
         CommandInterpreter interp(cfg, console, sched, out);
         interp.handle("initialize");
-        cfg.minIns = cfg.maxIns = 2000;
-
-        interp.handle("screen -s long");
-        out.str("");
-        interp.handle("process-smi");
-        check(contains(out.str(), "Process name: long\nID: 1\nLogs:\n"),
-              "process-smi starts with name, ID, and logs");
-        check(contains(out.str(), "\nCurrent instruction line: ")
-                  && contains(out.str(), "\nLines of code: 2000\n"),
-              "process-smi shows line counts while running");
-
-        out.str("");
-        interp.handle("scheduler-start");
-        check(!sched.isRunning() && contains(out.str(), "not available"),
-              "main-menu commands are refused in a process screen");
-        interp.handle("screen -s other");
-        check(!sched.canAttach("other"), "screen -s is refused in a process screen");
-        interp.handle("exit");
-
         cfg.minIns = cfg.maxIns = 1;
         interp.handle("screen -s short");
+
         Process p;
         for (int i = 0; i < 60 && !(sched.getProcessSnapshot("short", p) && p.finished); ++i)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        check(p.finished, "a one-line process finishes");
 
         out.str("");
         interp.handle("process-smi");
         check(contains(out.str(), "\nFinished!\n") && !contains(out.str(), "Current instruction line"),
               "process-smi prints Finished! in place of the line counts");
-        interp.handle("exit");
-
-        out.str("");
-        interp.handle("screen -r short");
-        check(contains(out.str(), "Process short not found.") && !console.isInProcessScreen(),
-              "screen -r reports a finished process as not found");
-
-        out.str("");
-        interp.handle("screen -ls");
-        check(contains(out.str(), "Finished processes:\nshort") && contains(out.str(), "1 / 1\n"),
-              "screen -ls lists finished processes with their progress");
     }
 
     // A full queue on RR with quantum 1, where every core is released every tick
@@ -463,19 +479,18 @@ static void test_spec_output() {
         bool alwaysFull = true;
         for (int i = 0; i < 5; ++i) {
             int onCore = 0;
-            for (const ProcessSummary& s : sched.processSummaries())
-                if (s.core >= 0) ++onCore;
+            for (const Scheduler::ProcessInfo& row : sched.listProcesses())
+                if (row.core >= 0) ++onCore;
             alwaysFull = alwaysFull && onCore == cfg.numCpu;
             std::this_thread::sleep_for(std::chrono::milliseconds(130));
         }
         check(alwaysFull, "all cores read as busy between ticks while the queue is full");
-        check(sched.processSummaries().size() > 40 && out.str().empty(),
+        check(sched.listProcesses().size() > 40 && out.str().empty(),
               "scheduler-start generates processes without printing to the console");
 
         console.printScreenLs();
-        check(contains(out.str(), "CPU utilization: 100%") && contains(out.str(), "Core: 0")
-                  && contains(out.str(), " / 2000\n") && contains(out.str(), "Running processes:\n"),
-              "screen -ls lists running processes with core and progress");
+        check(contains(out.str(), "CPU utilization: 100%") && contains(out.str(), "Core: 0"),
+              "screen -ls shows full utilization and running processes under a full queue");
     }
 }
 

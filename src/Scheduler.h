@@ -21,17 +21,6 @@
 #include <cstdint>
 #include <iosfwd>
 
-// One process's row in screen -ls and report-util.
-struct ProcessSummary {
-    std::string name;
-    std::string createdAt;
-    int         pid = 0;
-    int         core = -1;          // -1: not on a core (ready, sleeping, finished)
-    std::size_t currentLine = 0;
-    std::size_t totalLines = 0;
-    bool        finished = false;
-};
-
 class Scheduler {
 public:
 
@@ -48,16 +37,30 @@ public:
 
     //process checking
     bool createProcess(const std::string& name);
-    bool canAttach(const std::string& name) const; //exists and has not finished
+    bool hasProcess(const std::string& name) const;
 
     //copy of process state
     bool getProcessSnapshot(const std::string& name,Process& result) const;
 
-    //all processes in creation order, taken under one lock
-    std::vector<ProcessSummary> processSummaries() const;
+    //process counts
+    std::size_t processCount() const;
+    std::size_t finishedProcessCount() const;
+    std::size_t runningProcessCount() const;
 
     //cpu counts
     std::size_t coreCount() const;
+    std::size_t activeCoreCount() const;
+
+    //one row of screen -ls / report-util
+    struct ProcessInfo {
+        std::string name;
+        std::string created;
+        int core = -1;              // -1: not on a core right now
+        std::size_t currentLine = 0;
+        std::size_t totalLines = 0;
+        bool finished = false;
+    };
+    std::vector<ProcessInfo> listProcesses() const; // in creation order
 
 
 private:
@@ -74,6 +77,7 @@ private:
         Process process;
         ProcessState state = ProcessState::READY;
         uint64_t delayRemaining = 0; // busy-wait cycles
+        std::string created;         // timestamp() at creation
     };
 
     //config and output
@@ -88,6 +92,7 @@ private:
     //Thread Management
     std::thread cpuThread;
     mutable std::mutex schedulerMutex;
+    std::mutex outputMutex;
 
     bool initialized = false;
     bool shutdownRequested = false;
@@ -107,6 +112,6 @@ private:
     void handleSleepingProcesses();
     void releaseCore(Core& core);
     void generateAutomaticProcess();
-    void addProcess(const std::string& name); //caller holds schedulerMutex
+    void addProcess(const std::string& name); // caller holds schedulerMutex
     void logMessage(const std::string& message);
 };
