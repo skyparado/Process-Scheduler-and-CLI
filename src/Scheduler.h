@@ -1,13 +1,12 @@
 #pragma once
 // ============================================================================
-// Scheduler  -  STUB
-// Owner: Ethan
+// Scheduler  -  CSOPESY Emulator
+// Owner: Ethan  (Scheduler + Main/Controller module)
 //
-// Sky's Command Interpreter dispatches to this interface. The stub keeps just
-// enough state (a set of known process names + a running flag) so that
-// screen -s / screen -r / scheduler-start / scheduler-stop can be demonstrated
-// end-to-end. The real tick loop, CPU cores, ready queue, FCFS/RR, delays, and
-// SLEEP handling are added here by the Scheduler teammate.
+// Runs the CPU tick loop on a background thread: num-cpu cores, a ready queue,
+// FCFS or RR, delays-per-exec, and SLEEP giving up the core. scheduler-start
+// generates a process every batch-process-freq ticks. All state is guarded by
+// schedulerMutex, so the input thread can read it while processes run.
 // ============================================================================
 #include "Config.h"
 #include "Process.h"

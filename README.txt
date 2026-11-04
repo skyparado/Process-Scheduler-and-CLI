@@ -3,6 +3,13 @@ CSOPESY Major Output: Process Scheduler and CLI
 
 GitHub: https://github.com/skyparado/Process-Scheduler-and-CLI
 
+Developers
+----------
+Garcia, Theodore Rodolfo
+Magbatoc, Ethan Daniel
+Parado, Sky Hannah
+Villorente, Khyle Raeka
+
 Entry point
 -----------
 The main() function is in:  src/main.cpp
@@ -38,7 +45,8 @@ blocked until the config.txt parameters are loaded. Supported commands:
     screen -s <name>      create a new process screen
     screen -r <name>      re-attach to an existing process ("not found" if gone)
     screen -ls            list CPU utilization + running/finished processes
-    scheduler-start       begin generating dummy processes (p01, p02, ...)
+    scheduler-start       begin generating dummy processes (p01, p02, ...);
+                          its former name, scheduler-test, also works
     scheduler-stop        stop generating dummy processes
     report-util           save the screen -ls report to csopesy-log.txt
     process-smi           (inside a screen) print this process's info
@@ -83,8 +91,9 @@ batch-process-freq 1, min-ins 1000, max-ins 2000, delays-per-exec 0).
 
 MODULE OWNERSHIP
 ----------------
-Sky  : Command Interpreter (src/CommandInterpreter.*) + Config (src/Config.*),
-       plus tests/test_main.cpp.
-Theo : Process + Instructions (src/Process.*).
-Console UI / Display (src/Console.*) and Scheduler + Main/Controller
-(src/Scheduler.*, src/main.cpp: tick loop, cores, FCFS/RR) by the other members.
+Sky   : Command Interpreter (src/CommandInterpreter.*) + Config (src/Config.*),
+        plus tests/test_main.cpp.
+Theo  : Process + Instructions (src/Process.*).
+Khyle : Console UI / Display (src/Console.*).
+Ethan : Scheduler + Main/Controller (src/Scheduler.*, src/main.cpp: tick loop,
+        cores, FCFS/RR).

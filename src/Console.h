@@ -1,12 +1,10 @@
 #pragma once
 // ============================================================================
-// Console  -  STUB
-// Owner (to implement fully): the "Console UI / Display" teammate.
+// Console  -  CSOPESY Emulator
+// Owner: Khyle  (Console UI / Display module)
 //
-// Sky's Command Interpreter calls these methods; the stub prints clearly
-// labelled placeholders so the dispatch is visible during a demo. The real
-// ASCII header, process screen, process-smi layout, screen -ls table, and the
-// report-util file write are implemented here by the Console UI teammate.
+// Prints the main menu, process screen, process-smi, and screen -ls, and writes
+// the report-util file. Also owns the timestamp format used for all output.
 // ============================================================================
 #include <string>
 #include <iosfwd>

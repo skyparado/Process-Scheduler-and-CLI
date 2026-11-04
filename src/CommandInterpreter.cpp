@@ -133,7 +133,7 @@ bool CommandInterpreter::handle(const std::string& line) {
         handleScreen(pc);
         return true;
     }
-    if (pc.command == "scheduler-start") {
+    if (pc.command == "scheduler-start" || pc.command == "scheduler-test") {   // spec's former name
         scheduler.start();
         return true;
     }

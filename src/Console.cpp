@@ -12,6 +12,7 @@
 
 namespace {
 const char* clearScreen = "\x1b[2J\x1b[H";
+const char* lastUpdated = "11/04/2026";     // change when the program changes
 }
 
 std::string timestamp() {
@@ -44,7 +45,7 @@ void Console::printMainMenu() {
         << " | |___ ___) | |_| |  __/| |___ ___) | | |\n"
         << "  \\____|____/ \\___/|_|   |_____|____/  |_|\n"
         << "=======================================================\n"
-        << "Welcome to Group 3's CSOPESY Process Scheduler\n"
+        << "Welcome to CSOPESY Emulator!\n"
         << "\n"
         << "Developers:\n"
         << "      Garcia, Theodore Rodolfo \n"
@@ -52,7 +53,7 @@ void Console::printMainMenu() {
         << "      Parado, Sky Hannah \n"
         << "      Villorente, Khyle Raeka\n"
         << "\n"
-        << "Last updated: " << timestamp() << "\n\n"
+        << "Last updated: " << lastUpdated << "\n\n"
         << "Type 'initialize' to begin or 'exit' to quit.\n"
         << "=======================================================\n";
 }

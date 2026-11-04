@@ -1,10 +1,9 @@
 // ============================================================================
-// main.cpp  -  CSOPESY Emulator entry point (thin skeleton)
+// main.cpp  -  CSOPESY Emulator entry point
+// Owner: Ethan  (Scheduler + Main/Controller module)
 //
-// This thin driver wires Sky's Command Interpreter + Config to the stub
-// Console / Scheduler so the module runs and can be demoed. The Scheduler
-// teammate owns the real main()/tick-loop; this version reads a line and hands
-// it to the interpreter.
+// Reads a line of input and hands it to the Command Interpreter until 'exit'.
+// The CPU tick loop runs on the Scheduler's own thread (see Scheduler.cpp).
 // ============================================================================
 #include "Config.h"
 #include "Console.h"

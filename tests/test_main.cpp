@@ -1,10 +1,9 @@
 // ============================================================================
-// test_main.cpp  -  unit tests for Sky's Command Interpreter + Config module
-//                   and Theo's Process + Instructions module
+// test_main.cpp  -  unit tests for the Command Interpreter, Config, Process, and
+//                   Scheduler modules
 //
-// Tiny assertion harness (no external framework). Builds as its own executable;
-// does not need the teammates' real Console/Scheduler/Process code -- it uses
-// the stubs, driving everything through injected string streams.
+// Tiny assertion harness (no external framework). Builds as its own executable
+// and drives the real modules through injected string streams.
 // ============================================================================
 #include "../src/Config.h"
 #include "../src/Console.h"
@@ -150,6 +149,9 @@ static void test_gate_and_dispatch() {
         check(sched.isRunning(), "scheduler-start starts the scheduler");
         interp.handle("scheduler-stop");
         check(!sched.isRunning(), "scheduler-stop stops the scheduler");
+        interp.handle("scheduler-test");
+        check(sched.isRunning(), "scheduler-test also starts the scheduler");
+        interp.handle("scheduler-stop");
 
         // report-util dispatch
         out.str("");
