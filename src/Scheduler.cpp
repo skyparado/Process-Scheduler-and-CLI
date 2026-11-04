@@ -271,6 +271,9 @@ void Scheduler::runOneCpuCycle() {
             generateAutomaticProcess();
         }
     }
+
+    //refill cores freed this cycle, or screen -ls reads them as idle between cycles
+    assignReadyProcesses();
 }
 
 //assign ready processes to cores

@@ -435,12 +435,73 @@ static void test_process() {
 }
 
 // ---------------------------------------------------------------------------
+// Runs the real CPU thread, so these wait on real ticks.
+static void test_spec_output() {
+    std::cout << "[spec output]\n";
+
+    // process-smi swaps the line counts for Finished! once the process is done
+    {
+        std::ostringstream out;
+        Config cfg;
+        Console console(out);
+        Scheduler sched(cfg, out);
+        CommandInterpreter interp(cfg, console, sched, out);
+        interp.handle("initialize");
+        cfg.minIns = cfg.maxIns = 1;
+        interp.handle("screen -s short");
+
+        Process p;
+        for (int i = 0; i < 60 && !(sched.getProcessSnapshot("short", p) && p.finished); ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        out.str("");
+        interp.handle("process-smi");
+        check(contains(out.str(), "\nFinished!\n") && !contains(out.str(), "Current instruction line"),
+              "process-smi prints Finished! in place of the line counts");
+    }
+
+    // A full queue on RR with quantum 1, where every core is released every tick
+    {
+        std::ostringstream out;
+        Config cfg;
+        cfg.quantumCycles = 1;
+        cfg.minIns = cfg.maxIns = 2000;
+        Console console(out);
+        Scheduler sched(cfg, out);
+        console.setScheduler(&sched);
+        sched.initialize();
+        for (int i = 0; i < 40; ++i) sched.createProcess("w" + std::to_string(i));
+        sched.start();
+
+        out.str("");
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+
+        bool alwaysFull = true;
+        for (int i = 0; i < 5; ++i) {
+            int onCore = 0;
+            for (const Scheduler::ProcessInfo& row : sched.listProcesses())
+                if (row.core >= 0) ++onCore;
+            alwaysFull = alwaysFull && onCore == cfg.numCpu;
+            std::this_thread::sleep_for(std::chrono::milliseconds(130));
+        }
+        check(alwaysFull, "all cores read as busy between ticks while the queue is full");
+        check(sched.listProcesses().size() > 40 && out.str().empty(),
+              "scheduler-start generates processes without printing to the console");
+
+        console.printScreenLs();
+        check(contains(out.str(), "CPU utilization: 100%") && contains(out.str(), "Core: 0"),
+              "screen -ls shows full utilization and running processes under a full queue");
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     std::cout << "Running CSOPESY interpreter + config + process tests...\n";
     test_parse();
     test_gate_and_dispatch();
     test_config();
     test_process();
+    test_spec_output();
 
     std::cout << "----------------------------------------\n";
     std::cout << g_checks - g_failures << "/" << g_checks << " checks passed.\n";
