@@ -1,5 +1,6 @@
 
 #include "Scheduler.h"
+#include "Console.h"
 
 #include <iostream>
 #include <sstream>
@@ -120,27 +121,18 @@ bool Scheduler::createProcess(const std::string& name) {
         if (!initialized || shutdownRequested) {return false;}
         if (processes.find(name) != processes.end()) {return false;}
 
-        ManagedProcess managed;
-
-        managed.process.name = name;
-        managed.process.pid = nextPid++;
-        managed.process.generateInstructions(cfg.minIns,cfg.maxIns);
-
-        managed.state = ProcessState::READY;
-        managed.delayRemaining = 0;
-
-        processes.emplace(name, managed);
-        readyQueue.push_back(name);
+        addProcess(name);
     }
 
     logMessage("Process created: " + name);
     return true;
 }
 
-//check if process exists
-bool Scheduler::hasProcess(const std::string& name) const {
+//spec: a finished process can no longer be attached to with screen -r
+bool Scheduler::canAttach(const std::string& name) const {
     std::lock_guard<std::mutex> lock(schedulerMutex);
-    return processes.find(name) != processes.end();
+    auto it = processes.find(name);
+    return it != processes.end() && !it->second.process.finished;
 }
 
 //copy process state for console
@@ -157,55 +149,46 @@ bool Scheduler::getProcessSnapshot(const std::string& name,Process& result) cons
     return true;
 }
 
-//count processes
-std::size_t Scheduler::processCount() const {
+//rows for screen -ls and report-util
+std::vector<ProcessSummary> Scheduler::processSummaries() const {
     std::lock_guard<std::mutex> lock(schedulerMutex);
-    return processes.size();
-}
 
-//count finished processes
-std::size_t Scheduler::finishedProcessCount() const {
-    std::lock_guard<std::mutex> lock(schedulerMutex);
-    std::size_t count = 0;
-
-    for (const auto& entry : processes) {
-        if (entry.second.state == ProcessState::FINISHED) {
-            count++;
+    std::map<std::string, int> coreOf;
+    for (const Core& core : cores) {
+        if (!core.processName.empty()) {
+            coreOf[core.processName] = core.id;
         }
     }
-    return count;
-}
 
-//count unfinished processes
-std::size_t Scheduler::runningProcessCount() const {
-    std::lock_guard<std::mutex> lock(schedulerMutex);
-    std::size_t count = 0;
-
+    std::vector<ProcessSummary> summaries;
     for (const auto& entry : processes) {
-        if (entry.second.state != ProcessState::FINISHED) {
-            count++;
+        const Process& process = entry.second.process;
+
+        ProcessSummary summary;
+        summary.name = process.name;
+        summary.createdAt = process.createdAt;
+        summary.pid = process.pid;
+        summary.currentLine = process.currentLine;
+        summary.totalLines = process.totalLines;
+        summary.finished = process.finished;
+
+        auto core = coreOf.find(process.name);
+        if (core != coreOf.end()) {
+            summary.core = core->second;
         }
+        summaries.push_back(summary);
     }
-    return count;
+
+    //the map is in name order, which would put p100 before p11
+    std::sort(summaries.begin(), summaries.end(),
+        [](const ProcessSummary& a, const ProcessSummary& b) { return a.pid < b.pid; });
+    return summaries;
 }
 
 //core count
 std::size_t Scheduler::coreCount() const {
     std::lock_guard<std::mutex> lock(schedulerMutex);
     return cores.size();
-}
-
-//active core count
-std::size_t Scheduler::activeCoreCount() const {
-    std::lock_guard<std::mutex> lock(schedulerMutex);
-    std::size_t count = 0;
-
-    for (const Core& core : cores) {
-        if (!core.processName.empty()) {
-            count++;
-        }
-    }
-    return count;
 }
 
 void Scheduler::cpuLoop() {
@@ -280,6 +263,9 @@ void Scheduler::runOneCpuCycle() {
             generateAutomaticProcess();
         }
     }
+
+    //refill cores freed this cycle, or screen -ls reads them as idle between cycles
+    assignReadyProcesses();
 }
 
 //assign ready processes to cores
@@ -388,10 +374,15 @@ void Scheduler::generateAutomaticProcess() {
         return;
     }
 
+    addProcess(name);
+}
+
+void Scheduler::addProcess(const std::string& name) {
     ManagedProcess managed;
 
     managed.process.name = name;
     managed.process.pid = nextPid++;
+    managed.process.createdAt = timestamp();
     managed.process.generateInstructions(cfg.minIns,cfg.maxIns);
 
     managed.state = ProcessState::READY;
@@ -399,13 +390,10 @@ void Scheduler::generateAutomaticProcess() {
 
     processes.emplace(name, managed);
     readyQueue.push_back(name);
-
-    logMessage("Automatically generated process: " + name);
 }
 
-//log scheduler messages
+//log scheduler messages. Only call from the input thread: printing from the cpu
+//thread would write over the prompt and into attached process screens
 void Scheduler::logMessage(const std::string& message) {
-    std::lock_guard<std::mutex> lock(outputMutex);
-
     out << message << std::endl;
 }

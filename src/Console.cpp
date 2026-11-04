@@ -78,40 +78,21 @@ void Console::printProcessSmi(const std::string& name) {
         return;
     }
 
-    out << "-------------------------------------------------------\n"
-        << "Process Name: " << process.name << "\n"
-        << "Process ID: " << process.pid << "\n"
-        << "Created: " << timestamp() << "\n"
-        << "Current Instruction Line: " << process.currentLine << "\n"
-        << "Lines of Code: " << process.totalLines << "\n"
+    out << "Process name: " << process.name << "\n"
+        << "ID: " << process.pid << "\n"
         << "Logs:\n";
 
     for (const std::string& log : process.logs) {
-        out << "  " << log << "\n";
+        out << log << "\n";
     }
+    out << "\n";
 
     if (process.finished) {
-        out << "Finished.\n";
+        out << "Finished!\n";
+    } else {
+        out << "Current instruction line: " << process.currentLine << "\n"
+            << "Lines of code: " << process.totalLines << "\n";
     }
-    out << "-------------------------------------------------------\n";
-}
-
-
-std::string Console::screenLsText() const {
-    const std::size_t total = scheduler == nullptr ? 0 : scheduler->processCount();
-    const std::size_t finished = scheduler == nullptr ? 0 : scheduler->finishedProcessCount();
-    const std::size_t running = scheduler == nullptr ? 0 : scheduler->runningProcessCount();
-    const std::size_t cores = scheduler == nullptr ? 0 : scheduler->coreCount();
-    const std::size_t used = scheduler == nullptr ? 0 : scheduler->activeCoreCount();
-    const std::size_t utilization = cores == 0 ? 0 : used * 100 / cores;
-    std::ostringstream result;
-    result << "CPU utilization: " << utilization << "%\n"
-           << "Cores used: " << used << "\n"
-           << "Cores available: " << cores - used << "\n"
-           << "Running processes: " << running << "\n"
-           << "Finished processes: " << finished << "\n"
-           << "Total processes: " << total << "\n";
-    return result.str();
 }
 
 void Console::printScreenLs() {
@@ -129,10 +110,48 @@ void Console::saveReport() {
 }
 
 std::string Console::screenLsReport() const {
+    const std::vector<ProcessSummary> summaries =
+        scheduler == nullptr ? std::vector<ProcessSummary>() : scheduler->processSummaries();
+    const std::size_t cores = scheduler == nullptr ? 0 : scheduler->coreCount();
+
+    std::size_t used = 0;
+    std::size_t waiting = 0;
+    std::ostringstream running;
+    std::ostringstream finished;
+
+    for (const ProcessSummary& process : summaries) {
+        if (!process.finished && process.core < 0) {
+            waiting++;
+            continue;
+        }
+
+        std::ostringstream row;
+        if (!process.finished) {
+            used++;
+            row << "Core: " << process.core;
+        } else {
+            row << "Finished";
+        }
+
+        (process.finished ? finished : running)
+            << std::left << std::setw(12) << process.name
+            << " (" << process.createdAt << ")   "
+            << std::setw(12) << row.str()
+            << process.currentLine << " / " << process.totalLines << "\n";
+    }
+
+    const std::size_t utilization = cores == 0 ? 0 : used * 100 / cores;
     std::ostringstream result;
-    result << "-------------------------------------------------------\n"
-           << "screen -ls (" << timestamp() << ")\n"
-           << screenLsText()
+    result << "CPU utilization: " << utilization << "%\n"
+           << "Cores used: " << used << "\n"
+           << "Cores available: " << cores - used << "\n"
+           << "\n"
+           << "-------------------------------------------------------\n"
+           << "Running processes:\n" << running.str()
+           << "\n"
+           << "Waiting processes (ready or sleeping): " << waiting << "\n"
+           << "\n"
+           << "Finished processes:\n" << finished.str()
            << "-------------------------------------------------------\n";
     return result.str();
 }

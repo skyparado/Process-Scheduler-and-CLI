@@ -21,6 +21,17 @@
 #include <cstdint>
 #include <iosfwd>
 
+// One process's row in screen -ls and report-util.
+struct ProcessSummary {
+    std::string name;
+    std::string createdAt;
+    int         pid = 0;
+    int         core = -1;          // -1: not on a core (ready, sleeping, finished)
+    std::size_t currentLine = 0;
+    std::size_t totalLines = 0;
+    bool        finished = false;
+};
+
 class Scheduler {
 public:
 
@@ -37,19 +48,16 @@ public:
 
     //process checking
     bool createProcess(const std::string& name);
-    bool hasProcess(const std::string& name) const;
+    bool canAttach(const std::string& name) const; //exists and has not finished
 
     //copy of process state
     bool getProcessSnapshot(const std::string& name,Process& result) const;
 
-    //process counts
-    std::size_t processCount() const;
-    std::size_t finishedProcessCount() const;
-    std::size_t runningProcessCount() const;
+    //all processes in creation order, taken under one lock
+    std::vector<ProcessSummary> processSummaries() const;
 
     //cpu counts
     std::size_t coreCount() const;
-    std::size_t activeCoreCount() const;
 
 
 private:
@@ -80,7 +88,6 @@ private:
     //Thread Management
     std::thread cpuThread;
     mutable std::mutex schedulerMutex;
-    std::mutex outputMutex;
 
     bool initialized = false;
     bool shutdownRequested = false;
@@ -100,5 +107,6 @@ private:
     void handleSleepingProcesses();
     void releaseCore(Core& core);
     void generateAutomaticProcess();
+    void addProcess(const std::string& name); //caller holds schedulerMutex
     void logMessage(const std::string& message);
 };

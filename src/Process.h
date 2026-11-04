@@ -50,6 +50,7 @@ struct Process {
     std::string name;
     int         pid      = 0;
     bool        finished = false;
+    std::string createdAt;          // creation time, shown by screen -ls
     std::size_t currentLine = 0;    // lines executed so far
     std::size_t totalLines = 0;     // lines to execute; a FOR counts body * repeats
     std::vector<std::string> logs;  // formatted PRINT output

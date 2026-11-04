@@ -81,7 +81,7 @@ void CommandInterpreter::handleScreen(const ParsedCommand& pc) {
             out << "Error: 'screen -r' requires a process name.\n";
             return;
         }
-        if (!scheduler.hasProcess(pc.argument)) {
+        if (!scheduler.canAttach(pc.argument)) {
             out << "Process " << pc.argument << " not found.\n";
             return;
         }
@@ -105,6 +105,13 @@ bool CommandInterpreter::handle(const std::string& line) {
         if (pc.command == "initialize") { doInitialize(); return true; }
         if (pc.command == "exit")       { return false; }
         out << "Please run 'initialize' first.\n";
+        return true;
+    }
+
+    // --- Gate: a process screen only accepts 'process-smi' and 'exit' ---
+    if (console.isInProcessScreen() && pc.command != "process-smi" && pc.command != "exit") {
+        out << "'" << pc.command << "' is not available in a process screen. "
+               "Type 'exit' to return to the main menu.\n";
         return true;
     }
 

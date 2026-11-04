@@ -53,9 +53,14 @@ ID, logs, current instruction line, total lines of code, and `Finished!` when
 the process is complete. `exit` from a process screen returns to the main
 menu; `exit` from the main menu quits the program.
 
-`screen -ls` displays CPU utilization, cores used and available, and running
-and finished process counts. `report-util` writes the same report to
-`csopesy-log.txt`. All display timestamps use `MM/DD/YYYY HH:MM:SSAM/PM`.
+A process screen only accepts `process-smi` and `exit`. A finished process can
+no longer be re-attached to: `screen -r` reports it as not found.
+
+`screen -ls` displays CPU utilization, cores used and available, and lists each
+process on a core and each finished process with its creation time and progress.
+Processes that are ready or sleeping are shown as a count. `report-util` writes
+the same report to `csopesy-log.txt`. All display timestamps use
+`MM/DD/YYYY HH:MM:SSAM/PM`.
 
 Process instructions
 --------------------
