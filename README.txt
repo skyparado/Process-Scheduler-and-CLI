@@ -45,6 +45,7 @@ blocked until the config.txt parameters are loaded. Supported commands:
     screen -s <name>      create a new process screen
     screen -r <name>      re-attach to an existing process ("not found" if gone)
     screen -ls            list CPU utilization + running/finished processes
+                          (screen-ls also works)
     scheduler-start       begin generating dummy processes (p01, p02, ...);
                           its former name, scheduler-test, also works
     scheduler-stop        stop generating dummy processes
@@ -88,6 +89,15 @@ config.txt
 Space-separated key/value file read by `initialize`. Out-of-range or missing
 values fall back to the spec defaults (num-cpu 4, scheduler rr, quantum-cycles 5,
 batch-process-freq 1, min-ins 1000, max-ins 2000, delays-per-exec 0).
+
+Add `alternating-print-add 1` for the quiz's alternating test (off by default).
+Every new process then starts with x = 0 and runs PRINT("Value from: " + x),
+ADD(x, x, [1-10]), PRINT, ADD, ... instead of a random program.
+
+Add `batch-unit-ticks N` to make one batch-process-freq unit last N ticks. It
+defaults to 1, which follows the spec exactly. This line departs from the spec:
+at 1, a process arrives faster than a core can run it, so the quiz's idle-CPU
+tests can never go idle. Use `batch-unit-ticks 30` for those tests only.
 
 MODULE OWNERSHIP
 ----------------

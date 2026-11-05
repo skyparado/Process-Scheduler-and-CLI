@@ -8,7 +8,7 @@
 #include <chrono>
 #include <algorithm>
 
-static const int TICK_INTERVAL_MS = 100; // ms per cpu cycle
+static const int TICK_INTERVAL_MS = 50; // ms per cpu cycle
 
 Scheduler::Scheduler(const Config& cfg, std::ostream& out)
     : cfg(cfg), out(out) {
@@ -266,8 +266,8 @@ void Scheduler::runOneCpuCycle() {
     if (generatorEnabled) {
     ticksSinceGeneration++;
 
-    const uint64_t ticksPerSecond = (1000 + TICK_INTERVAL_MS - 1) / TICK_INTERVAL_MS;
-    const uint64_t generationInterval = cfg.batchProcessFreq * ticksPerSecond;
+    // batch-unit-ticks defaults to 1: the spec's one process per batch-process-freq ticks.
+    const uint64_t generationInterval = cfg.batchProcessFreq * cfg.batchUnitTicks;
 
     if (ticksSinceGeneration >= generationInterval) {
         ticksSinceGeneration = 0;
@@ -394,7 +394,11 @@ void Scheduler::addProcess(const std::string& name) {
 
     managed.process.name = name;
     managed.process.pid = nextPid++;
-    managed.process.generateInstructions(cfg.minIns,cfg.maxIns);
+    if (cfg.alternatingPrintAdd) {
+        managed.process.generateAlternating(cfg.minIns, cfg.maxIns);
+    } else {
+        managed.process.generateInstructions(cfg.minIns, cfg.maxIns);
+    }
 
     managed.state = ProcessState::READY;
     managed.delayRemaining = 0;

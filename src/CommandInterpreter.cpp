@@ -62,6 +62,11 @@ void CommandInterpreter::doInitialize() {
         << ", min-ins=" << cfg.minIns
         << ", max-ins=" << cfg.maxIns
         << ", delays-per-exec=" << cfg.delaysPerExec << ")\n";
+    if (cfg.alternatingPrintAdd)
+        out << "Alternating PRINT/ADD programs are on (alternating-print-add 1).\n";
+    if (cfg.batchUnitTicks != 1)
+        out << "Process generation is scaled: one batch-process-freq unit = "
+            << cfg.batchUnitTicks << " ticks (batch-unit-ticks).\n";
 }
 
 // ----------------------------------------------------------------------------
@@ -131,6 +136,10 @@ bool CommandInterpreter::handle(const std::string& line) {
     }
     if (pc.command == "screen") {
         handleScreen(pc);
+        return true;
+    }
+    if (pc.command == "screen-ls") {   // the spec and quiz also spell it this way
+        console.printScreenLs();
         return true;
     }
     if (pc.command == "scheduler-start" || pc.command == "scheduler-test") {   // spec's former name

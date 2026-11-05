@@ -68,6 +68,16 @@ void generateBlock(std::vector<Instruction>& block, uint64_t lines, int depth) {
     }
 }
 
+// `lines` lines of PRINT, ADD, PRINT, ..., always starting on a PRINT.
+std::vector<Instruction> alternatingLines(uint64_t lines) {
+    std::vector<Instruction> block;
+    for (uint64_t i = 0; i < lines; ++i) {
+        if (i % 2 == 0) block.push_back(Instruction::Print("Value from: ", "x"));
+        else block.push_back(Instruction::Add("x", "x", static_cast<int>(pick(1, 10))));
+    }
+    return block;
+}
+
 int forDepth(const std::vector<Instruction>& block) {
     int deepest = 0;
     for (const Instruction& ins : block)
@@ -150,6 +160,23 @@ void Process::generateInstructions(uint64_t minIns, uint64_t maxIns) {
     const auto range = std::minmax(minIns, maxIns);
     std::vector<Instruction> program;
     generateBlock(program, pick(range.first, range.second), 0);
+    setInstructions(std::move(program));
+}
+
+void Process::generateAlternating(uint64_t minIns, uint64_t maxIns) {
+    const auto range = std::minmax(minIns, maxIns);
+    const uint64_t lines = pick(range.first, range.second);
+
+    // Long programs repeat one stored block so they fit in memory, like generateBlock.
+    // MAX_STORED_LINES is even, so the PRINT/ADD order holds across every repeat.
+    std::vector<Instruction> program;
+    if (lines >= MAX_STORED_LINES)
+        program.push_back(Instruction::For(alternatingLines(MAX_STORED_LINES),
+                                           lines / MAX_STORED_LINES));
+    for (Instruction& ins : alternatingLines(lines % MAX_STORED_LINES))
+        program.push_back(std::move(ins));
+
+    variables["x"] = 0;
     setInstructions(std::move(program));
 }
 

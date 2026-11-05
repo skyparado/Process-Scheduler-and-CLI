@@ -14,6 +14,14 @@ add_executable(csopesy
     src/Process.cpp
 )
 
+# Visual Studio runs the exe from its build folder, where 'initialize' looks for
+# config.txt. This runs on every build, so an edited config.txt takes effect on Run.
+add_custom_target(copy_config ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_SOURCE_DIR}/config.txt ${CMAKE_BINARY_DIR}/config.txt
+)
+add_dependencies(csopesy copy_config)
+
 # Unit tests (Command Interpreter + Config, Process + Instructions)
 add_executable(csopesy_tests
     tests/test_main.cpp

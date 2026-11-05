@@ -20,6 +20,8 @@ struct Config {
     uint64_t    minIns           = 1000;   // min-ins            [1, 2^32]
     uint64_t    maxIns           = 2000;   // max-ins            [1, 2^32]
     uint64_t    delaysPerExec    = 0;      // delays-per-exec    [0, 2^32]
+    uint64_t    alternatingPrintAdd = 0;   // alternating-print-add {0, 1}: quiz Q5 programs
+    uint64_t    batchUnitTicks   = 1;      // batch-unit-ticks   [1, 10^6]: ticks per batch-process-freq unit
 
     // Inclusive upper bound used by the ranges above (2^32).
     static constexpr uint64_t U32_CEIL = 4294967296ULL;

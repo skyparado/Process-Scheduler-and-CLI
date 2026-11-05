@@ -138,5 +138,11 @@ Config Config::loadFromFile(const std::string& path, std::ostream& log) {
     else
         log << "[config] 'delays-per-exec' missing; using default " << cfg.delaysPerExec << ".\n";
 
+    // Optional and not in the spec's list, so a missing key is not worth a warning.
+    if (has("alternating-print-add"))
+        takeU64("alternating-print-add", kv["alternating-print-add"], 0, 1, cfg.alternatingPrintAdd, log);
+    if (has("batch-unit-ticks"))
+        takeU64("batch-unit-ticks", kv["batch-unit-ticks"], 1, 1000000, cfg.batchUnitTicks, log);
+
     return cfg;
 }

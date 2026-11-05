@@ -63,6 +63,10 @@ struct Process {
     // Load a random program of minIns..maxIns lines (in either order).
     void generateInstructions(uint64_t minIns, uint64_t maxIns);
 
+    // Quiz Q5: start with x = 0 and run PRINT("Value from: " + x), ADD(x, x, [1-10]),
+    // PRINT, ADD, ... for minIns..maxIns lines.
+    void generateAlternating(uint64_t minIns, uint64_t maxIns);
+
     // Execute the next line on `core`: call once per CPU tick the process runs.
     // Does nothing while the process is asleep or finished.
     void executeNext(int core);

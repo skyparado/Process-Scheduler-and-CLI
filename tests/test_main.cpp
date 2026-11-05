@@ -241,6 +241,34 @@ static void test_config() {
         std::string path = writeTemp("test_cfg_altkey.txt", "delay-per-exec 7\n");
         Config c = Config::loadFromFile(path, log);
         check(c.delaysPerExec == 7, "accepts 'delay-per-exec' spelling");
+        check(c.alternatingPrintAdd == 0, "alternating-print-add is off when missing");
+        check(!contains(log.str(), "alternating-print-add"), "missing optional key is not warned about");
+        std::remove(path.c_str());
+    }
+
+    // batch-unit-ticks: defaults to the spec's 1, 0 is out of range
+    {
+        std::ostringstream log;
+        std::string path = writeTemp("test_cfg_unit.txt", "batch-unit-ticks 30\n");
+        check(Config::loadFromFile(path, log).batchUnitTicks == 30, "batch-unit-ticks read");
+        std::remove(path.c_str());
+
+        path = writeTemp("test_cfg_unit.txt", "batch-unit-ticks 0\n");
+        check(Config::loadFromFile(path, log).batchUnitTicks == 1,
+              "batch-unit-ticks out of range falls back to 1");
+        std::remove(path.c_str());
+    }
+
+    // alternating-print-add: 1 turns it on, anything but 0/1 keeps it off
+    {
+        std::ostringstream log;
+        std::string path = writeTemp("test_cfg_alt.txt", "alternating-print-add 1\n");
+        check(Config::loadFromFile(path, log).alternatingPrintAdd == 1, "alternating-print-add read");
+        std::remove(path.c_str());
+
+        path = writeTemp("test_cfg_alt.txt", "alternating-print-add 2\n");
+        check(Config::loadFromFile(path, log).alternatingPrintAdd == 0,
+              "alternating-print-add out of range falls back to off");
         std::remove(path.c_str());
     }
 }
@@ -264,6 +292,38 @@ static void scan(const std::vector<Instruction>& block, int depth,
             if (depth + 1 > deepest) deepest = depth + 1;
             scan(ins.body, depth + 1, seen, deepest, stored);
         }
+    }
+}
+
+// Quiz Q5: every second line prints x, and x rises by 1-10 between prints.
+static void test_alternating() {
+    std::cout << "[alternating]\n";
+
+    // 10001 is above MAX_STORED_LINES, so this also covers the repeated block and
+    // the leftover line, which must still be a PRINT.
+    for (uint64_t lines : {uint64_t{10}, uint64_t{10001}}) {
+        Process p;
+        p.name = "proc-01";
+        p.generateAlternating(lines, lines);
+        check(p.variables.count("x") == 1 && p.variables["x"] == 0, "x starts at 0 in the symbol table");
+        check(p.totalLines == lines, "program has the requested number of lines");
+
+        runToEnd(p);
+        check(p.finished && p.currentLine == lines, "program runs every line");
+        check(p.logs.size() == (lines + 1) / 2, "every second line is a PRINT");
+
+        bool stepsOk = !p.logs.empty();
+        int previous = 0;
+        for (std::size_t i = 0; i < p.logs.size() && stepsOk; ++i) {
+            const std::string marker = "\"Value from: ";
+            const std::size_t at = p.logs[i].find(marker);
+            if (at == std::string::npos) { stepsOk = false; break; }
+            const int value = std::stoi(p.logs[i].substr(at + marker.size()));
+            const int step = value - previous;
+            stepsOk = i == 0 ? value == 0 : (step >= 1 && step <= 10);
+            previous = value;
+        }
+        check(stepsOk, "PRINT shows x starting at 0 and rising by 1-10 each time");
     }
 }
 
@@ -460,6 +520,11 @@ static void test_spec_output() {
         interp.handle("process-smi");
         check(contains(out.str(), "\nFinished!\n") && !contains(out.str(), "Current instruction line"),
               "process-smi prints Finished! in place of the line counts");
+
+        interp.handle("exit");
+        out.str("");
+        interp.handle("screen-ls");
+        check(contains(out.str(), "CPU utilization:"), "screen-ls works like screen -ls");
     }
 
     // A full queue on RR with quantum 1, where every core is released every tick
@@ -503,6 +568,7 @@ int main() {
     test_gate_and_dispatch();
     test_config();
     test_process();
+    test_alternating();
     test_spec_output();
 
     std::cout << "----------------------------------------\n";
