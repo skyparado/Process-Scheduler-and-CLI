@@ -11,5 +11,7 @@ csopesy-log.txt
 
 # Editor / OS
 .vs/
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
 *.user
