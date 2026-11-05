@@ -264,13 +264,16 @@ void Scheduler::runOneCpuCycle() {
 
     //generate new process
     if (generatorEnabled) {
-        ticksSinceGeneration++;
+    ticksSinceGeneration++;
 
-        if (ticksSinceGeneration >= cfg.batchProcessFreq) {
-            ticksSinceGeneration = 0;
-            generateAutomaticProcess();
-        }
+    const uint64_t ticksPerSecond = (1000 + TICK_INTERVAL_MS - 1) / TICK_INTERVAL_MS;
+    const uint64_t generationInterval = cfg.batchProcessFreq * ticksPerSecond;
+
+    if (ticksSinceGeneration >= generationInterval) {
+        ticksSinceGeneration = 0;
+        generateAutomaticProcess();
     }
+}
 
     //refill cores freed this cycle, or screen -ls reads them as idle between cycles
     assignReadyProcesses();
